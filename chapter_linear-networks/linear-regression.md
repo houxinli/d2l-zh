@@ -507,6 +507,120 @@ $$-\log P(\mathbf y \mid \mathbf X) = \sum_{i=1}^n \frac{1}{2} \log(2 \pi \sigma
     1. 请试着写出解析解。
     1. 提出一种随机梯度下降算法来解决这个问题。哪里可能出错？（提示：当我们不断更新参数时，在驻点附近会发生什么情况）请尝试解决这个问题。
 
+## 练习解答
+
+### 1. 最小化平方误差和正态分布
+
+1.1 求解最优值$b$：
+
+目标是最小化：$\sum_i (x_i - b)^2$
+
+对$b$求导并令其为0：
+$$
+\frac{d}{db}\sum_i (x_i - b)^2 = -2\sum_i (x_i - b) = 0
+$$
+
+解得：
+$$
+b = \frac{1}{n}\sum_i x_i
+$$
+
+1.2 与正态分布的关系：
+
+- 如果数据$x_i$来自正态分布$\mathcal{N}(\mu, \sigma^2)$，则样本均值$\bar{x}$是$\mu$的最大似然估计
+- 最小化平方误差等价于假设数据服从正态分布时的最大似然估计
+- 这就是为什么这个估计器被称为最小二乘估计，它与正态分布的最大似然估计是一致的
+
+### 2. 线性回归的解析解
+
+2.1 矩阵表示：
+$$
+\min_w \|\mathbf{X}w - \mathbf{y}\|^2
+$$
+
+2.2 计算梯度：
+$$
+\begin{align}
+\frac{\partial}{\partial w}\|\mathbf{X}w - \mathbf{y}\|^2 
+&= \frac{\partial}{\partial w}(w^\top\mathbf{X}^\top\mathbf{X}w - 2w^\top\mathbf{X}^\top\mathbf{y} + \mathbf{y}^\top\mathbf{y}) \\
+&= 2\mathbf{X}^\top\mathbf{X}w - 2\mathbf{X}^\top\mathbf{y}
+\end{align}
+$$
+
+2.3 解析解：
+
+令梯度为0：
+$$
+\mathbf{X}^\top\mathbf{X}w = \mathbf{X}^\top\mathbf{y}
+$$
+
+解得：
+$$
+w = (\mathbf{X}^\top\mathbf{X})^{-1}\mathbf{X}^\top\mathbf{y}
+$$
+
+2.4 解析解vs随机梯度下降：
+
+解析解更好的情况：
+- 数据集较小
+- 特征维度不太高
+- 需要精确解
+- 计算资源充足
+
+解析解可能失效的情况：
+- 当$\mathbf{X}^\top\mathbf{X}$不可逆（例如特征之间存在线性相关）
+- 数据集太大
+- 特征维度太高
+- 内存限制
+
+### 3. 指数分布噪声模型
+
+3.1 负对数似然：
+
+给定$p(\epsilon) = \frac{1}{2} \exp(-|\epsilon|)$，且$\epsilon = y - Xw$：
+$$
+-\log P(\mathbf{y}|\mathbf{X}) = \sum_i (|y_i - \mathbf{x}_i^\top w| + \log 2)
+$$
+
+3.2 这个问题没有闭式解析解，因为绝对值函数在0处不可导。
+
+3.3 SGD解决方案：
+
+主要挑战是绝对值函数在0处不可导。可以通过以下方法解决：
+
+1. 使用次梯度：
+```python
+def sign(x):
+    return torch.where(x > 0, 1., torch.where(x < 0, -1., 0.))
+
+def sgd_step(X, y, w, lr):
+    error = X @ w - y
+    grad = X.T @ sign(error)
+    w = w - lr * grad
+    return w
+```
+
+2. 使用平滑近似：
+```python
+def smooth_abs(x, epsilon=1e-6):
+    return torch.sqrt(x * x + epsilon)
+
+def sgd_step_smooth(X, y, w, lr):
+    error = X @ w - y
+    grad = X.T @ (error / smooth_abs(error))
+    w = w - lr * grad
+    return w
+```
+
+3. 使用Huber损失作为替代：
+```python
+def huber_loss(error, delta=1.0):
+    mask = torch.abs(error) <= delta
+    return torch.where(mask, 
+                      0.5 * error**2,
+                      delta * torch.abs(error) - 0.5 * delta**2)
+```
+
 :begin_tab:`mxnet`
 [Discussions](https://discuss.d2l.ai/t/1774)
 :end_tab:
